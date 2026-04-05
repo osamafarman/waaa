@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Puffy Waffle & Crepe</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Tajawal:wght@300;400;500;700;800&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <style>
 :root{
   --or:#E8500A;--orl:#FF7A35;--cr:#FFF5EE;--pc:#FFD4B8;--br:#6B3520;--dk:#1A0A00;--wh:#fff;
@@ -1001,44 +1003,50 @@ function doSubmit(){
   if(!table){alert(t('alertTable'));return;}
   if(!SEL.prod){alert(t('alertProd'));return;}
   if(!SEL.cont){alert(t('alertCont'));return;}
-  var orders=getOrders();
-  var num=orders.length+1;
   var currency = t('currency');
-  var order={
-    id:'P'+String(num).padStart(3,'0'),
-    name:name,table:table,prod:SEL.prod,cont:SEL.cont,
-    sub:Object.assign({},SEL.sub),
-    choco:SEL.c.slice(),fruit:SEL.f.slice(),deco:SEL.d.slice(),
-    note:note,total:getTotal(),currency:currency,time:new Date().toLocaleString(),
-    status:'new',lang:LANG
-  };
-  orders.push(order);
-  saveOrders(orders);
-  CURRENT_ORDER_ID=order.id;
-  document.getElementById('mainPage').style.display='none';
-  document.getElementById('floatBtn').style.display='none';
-  document.getElementById('sucNo').textContent='#'+order.id;
-  var d='<b>'+t('sumCust')+':</b> '+order.name+'<br>';
-  d+='<b>'+t('sumTable')+':</b> '+order.table+'<br>';
-  d+='<b>'+t('sumProd')+':</b> '+getDisplayName(order.prod)+'<br>';
-  d+='<b>'+t('sumCont')+':</b> '+t(order.cont)+'<br>';
-  if(Object.keys(order.sub).length) d+='<b>'+t('sumSub')+':</b> '+Object.values(order.sub).join(', ')+'<br>';
-  if(order.choco.length) d+='<b>'+t('sumChoco')+':</b> '+order.choco.join(', ')+'<br>';
-  if(order.fruit.length) d+='<b>'+t('sumFruit')+':</b> '+order.fruit.join(', ')+'<br>';
-  if(order.deco.length) d+='<b>'+t('sumDeco')+':</b> '+order.deco.join(', ')+'<br>';
-  if(order.note) d+='<b>'+t('sumNote')+':</b> '+order.note+'<br>';
-  d+='<b>'+t('totalLabel')+':</b> <span style="color:var(--or);font-weight:700;">'+order.total+' '+currency+'</span>';
-  document.getElementById('sucDetail').innerHTML=d;
-  document.getElementById('successPage').style.display='flex';
-  document.getElementById('sucTitle').textContent=t('sucTitle');
-  document.getElementById('sucMsg').textContent=t('sucMsg');
-  document.getElementById('trackerTitle').textContent=t('trackerTitle');
-  document.getElementById('stepLbl0').textContent=t('stepLbl0');
-  document.getElementById('stepLbl1').textContent=t('stepLbl1');
-  document.getElementById('stepLbl2').textContent=t('stepLbl2');
-  document.getElementById('refreshBtn').textContent=t('refreshBtn');
-  document.getElementById('newOrderBtn').textContent=t('newOrderBtn');
-  updateStatusDisplay(order.status);
+  var btn = document.querySelector('.sub-btn-main');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ ...'; }
+  getNextOrderNumber(function(num){
+    var order={
+      id:'P'+String(num).padStart(3,'0'),
+      name:name,table:table,prod:SEL.prod,cont:SEL.cont,
+      sub:Object.assign({},SEL.sub),
+      choco:SEL.c.slice(),fruit:SEL.f.slice(),deco:SEL.d.slice(),
+      note:note,total:getTotal(),currency:currency,
+      time:new Date().toISOString(),
+      timeDisplay:new Date().toLocaleString(),
+      status:'new',lang:LANG
+    };
+    addOrderToFirebase(order, function(ok){
+      if(btn){ btn.disabled=false; btn.textContent=t('submitBtn'); }
+      if(!ok){ alert('❌ حدث خطأ في الحفظ، حاول مرة أخرى'); return; }
+      CURRENT_ORDER_ID=order.id;
+      document.getElementById('mainPage').style.display='none';
+      document.getElementById('floatBtn').style.display='none';
+      document.getElementById('sucNo').textContent='#'+order.id;
+      var d='<b>'+t('sumCust')+':</b> '+order.name+'<br>';
+      d+='<b>'+t('sumTable')+':</b> '+order.table+'<br>';
+      d+='<b>'+t('sumProd')+':</b> '+getDisplayName(order.prod)+'<br>';
+      d+='<b>'+t('sumCont')+':</b> '+t(order.cont)+'<br>';
+      if(Object.keys(order.sub).length) d+='<b>'+t('sumSub')+':</b> '+Object.values(order.sub).join(', ')+'<br>';
+      if(order.choco.length) d+='<b>'+t('sumChoco')+':</b> '+order.choco.join(', ')+'<br>';
+      if(order.fruit.length) d+='<b>'+t('sumFruit')+':</b> '+order.fruit.join(', ')+'<br>';
+      if(order.deco.length) d+='<b>'+t('sumDeco')+':</b> '+order.deco.join(', ')+'<br>';
+      if(order.note) d+='<b>'+t('sumNote')+':</b> '+order.note+'<br>';
+      d+='<b>'+t('totalLabel')+':</b> <span style="color:var(--or);font-weight:700;">'+order.total+' '+currency+'</span>';
+      document.getElementById('sucDetail').innerHTML=d;
+      document.getElementById('successPage').style.display='flex';
+      document.getElementById('sucTitle').textContent=t('sucTitle');
+      document.getElementById('sucMsg').textContent=t('sucMsg');
+      document.getElementById('trackerTitle').textContent=t('trackerTitle');
+      document.getElementById('stepLbl0').textContent=t('stepLbl0');
+      document.getElementById('stepLbl1').textContent=t('stepLbl1');
+      document.getElementById('stepLbl2').textContent=t('stepLbl2');
+      document.getElementById('refreshBtn').textContent=t('refreshBtn');
+      document.getElementById('newOrderBtn').textContent=t('newOrderBtn');
+      updateStatusDisplay(order.status);
+    });
+  });
 }
 
 // ===== STATUS =====
@@ -1080,14 +1088,80 @@ function updateStatusDisplay(status){
   }
 }
 function refreshStatus(){
-  if(!CURRENT_ORDER_ID)return;
-  var o=getOrders().find(function(x){return x.id===CURRENT_ORDER_ID;});
-  if(o)updateStatusDisplay(o.status);
+  if(!CURRENT_ORDER_ID) return;
+  initFirebase();
+  DB.collection('orders').doc(CURRENT_ORDER_ID).get().then(function(doc){
+    if(doc.exists) updateStatusDisplay(doc.data().status);
+  });
 }
 
-// ===== STORAGE =====
-function getOrders(){try{return JSON.parse(localStorage.getItem('puffyOrders')||'[]');}catch(e){return[];}}
-function saveOrders(arr){try{localStorage.setItem('puffyOrders',JSON.stringify(arr));}catch(e){}}
+// ===== FIREBASE STORAGE =====
+var DB = null;
+var ORDERS_CACHE = [];
+var ADMIN_UNSUBSCRIBE = null;
+
+function initFirebase(){
+  if(DB) return;
+  var firebaseConfig = {
+    apiKey: "AIzaSyAxOpdVN1mmYXjyqh5ptiAd_2eaQ9VjUJo",
+    authDomain: "puffy-waffle.firebaseapp.com",
+    projectId: "puffy-waffle",
+    storageBucket: "puffy-waffle.firebasestorage.app",
+    messagingSenderId: "755822893725",
+    appId: "1:755822893725:web:3225a91ccfbd86d8e89274"
+  };
+  firebase.initializeApp(firebaseConfig);
+  DB = firebase.firestore();
+}
+
+function getOrders(){ return ORDERS_CACHE; }
+
+function saveOrders(arr){
+  // Not used directly anymore — orders saved one-by-one via addOrder
+  ORDERS_CACHE = arr;
+}
+
+function addOrderToFirebase(order, callback){
+  initFirebase();
+  DB.collection('orders').doc(order.id).set(order)
+    .then(function(){ if(callback) callback(true); })
+    .catch(function(e){ console.error(e); if(callback) callback(false); });
+}
+
+function changeStatusFirebase(id, status){
+  initFirebase();
+  DB.collection('orders').doc(id).update({status: status})
+    .catch(function(e){ console.error(e); });
+}
+
+function clearAllFirebase(){
+  initFirebase();
+  DB.collection('orders').get().then(function(snap){
+    var batch = DB.batch();
+    snap.forEach(function(doc){ batch.delete(doc.ref); });
+    return batch.commit();
+  }).then(function(){ ORDERS_CACHE=[]; renderAdmin(); })
+    .catch(function(e){ console.error(e); });
+}
+
+function listenToOrders(callback){
+  initFirebase();
+  if(ADMIN_UNSUBSCRIBE) ADMIN_UNSUBSCRIBE();
+  ADMIN_UNSUBSCRIBE = DB.collection('orders')
+    .orderBy('time', 'desc')
+    .onSnapshot(function(snap){
+      ORDERS_CACHE = [];
+      snap.forEach(function(doc){ ORDERS_CACHE.push(doc.data()); });
+      callback(ORDERS_CACHE);
+    }, function(err){ console.error(err); });
+}
+
+function getNextOrderNumber(callback){
+  initFirebase();
+  DB.collection('orders').get().then(function(snap){
+    callback(snap.size + 1);
+  }).catch(function(){ callback(Math.floor(Math.random()*900)+100); });
+}
 
 // ===== ADMIN LOGIN =====
 function selectRole(role){
@@ -1122,6 +1196,7 @@ function doLogin(){
   }
 }
 function showMain(){
+  if(ADMIN_UNSUBSCRIBE){ ADMIN_UNSUBSCRIBE(); ADMIN_UNSUBSCRIBE=null; }
   document.getElementById('loginPage').classList.remove('show');
   document.getElementById('adminPage').classList.remove('show');
   document.getElementById('menuAdminPage').classList.remove('show');
@@ -1131,51 +1206,53 @@ function showMain(){
   renderOrderPage();
 }
 
-// ===== ORDER ADMIN =====
 function filterOrders(f,el){
   CURRENT_FILTER=f;
   document.querySelectorAll('.ftab').forEach(function(x){x.classList.remove('active');});
   el.classList.add('active');
   renderAdmin();
 }
-function refreshAdmin(){renderAdmin();}
-function clearAll(){if(confirm('Delete all orders?')){saveOrders([]);renderAdmin();}}
+function refreshAdmin(){ renderAdmin(); }
+function clearAll(){
+  if(confirm('Delete all orders?')){ clearAllFirebase(); }
+}
 function changeStatus(id,s){
-  var orders=getOrders();
-  var idx=orders.findIndex(function(o){return o.id===id;});
-  if(idx>-1){orders[idx].status=s;saveOrders(orders);renderAdmin();}
+  changeStatusFirebase(id,s);
 }
 function renderAdmin(){
-  var orders=getOrders();
-  var total=orders.reduce(function(s,o){return s+o.total;},0);
-  document.getElementById('admStats').innerHTML=
-    stat(orders.length,'Total')+stat(total+' ₺/ل.ت','Revenue')+
-    stat(orders.filter(function(o){return o.status==='new';}).length,'New')+
-    stat(orders.filter(function(o){return o.status==='working';}).length,'Working')+
-    stat(orders.filter(function(o){return o.status==='ready';}).length,'Ready');
-  if(!orders.length){document.getElementById('admOrders').innerHTML='<div class="no-ord">No orders yet 🧇</div>';return;}
-  var so={new:0,working:1,ready:2,cancelled:3};
-  var fil=orders.filter(function(o){return CURRENT_FILTER==='all'||o.status===CURRENT_FILTER;});
-  fil.sort(function(a,b){return (so[a.status]||0)-(so[b.status]||0)||(b.id>a.id?1:-1);});
-  if(!fil.length){document.getElementById('admOrders').innerHTML='<div class="no-ord">No orders with this status 📭</div>';return;}
-  document.getElementById('admOrders').innerHTML=fil.map(function(o){
-    var curr = o.currency||'₺';
-    var det='<b>Product:</b> '+o.prod+' — '+o.cont+'<br>';
-    if(o.sub&&Object.keys(o.sub).length) det+='<b>Options:</b> '+Object.values(o.sub).join(', ')+'<br>';
-    if(o.choco&&o.choco.length) det+='<b>Choco:</b> '+o.choco.join(', ')+'<br>';
-    if(o.fruit&&o.fruit.length) det+='<b>Fruit:</b> '+o.fruit.join(', ')+'<br>';
-    if(o.deco&&o.deco.length) det+='<b>Deco:</b> '+o.deco.join(', ')+'<br>';
-    if(o.note) det+='<b>Note:</b> '+o.note+'<br>';
-    var cc=o.status==='working'?' status-working-card':o.status==='ready'?' status-ready-card':o.status==='cancelled'?' status-cancelled-card':'';
-    var badge=o.status==='new'?'<span class="ord-badge badge-new">🆕 New</span>':o.status==='working'?'<span class="ord-badge badge-working">⚙️ Working</span>':o.status==='ready'?'<span class="ord-badge badge-ready">✅ Ready</span>':'<span class="ord-badge badge-cancelled">❌ Cancelled</span>';
-    var acts='<div class="ord-actions">';
-    if(o.status!=='working'&&o.status!=='ready'&&o.status!=='cancelled') acts+='<button class="act-btn act-working" onclick="changeStatus(\''+o.id+'\',\'working\')">⚙️ Working</button>';
-    if(o.status!=='ready'&&o.status!=='cancelled') acts+='<button class="act-btn act-ready" onclick="changeStatus(\''+o.id+'\',\'ready\')">✅ Ready</button>';
-    if(o.status!=='cancelled') acts+='<button class="act-btn act-cancel" onclick="changeStatus(\''+o.id+'\',\'cancelled\')">❌ Cancel</button>';
-    if(o.status==='cancelled'||o.status==='ready') acts+='<button class="act-btn act-restore" onclick="changeStatus(\''+o.id+'\',\'new\')">↩️ Restore</button>';
-    acts+='</div>';
-    return '<div class="ord-card'+cc+'"><div class="ord-hdr"><span class="ord-no">#'+o.id+' — Table '+o.table+'</span>'+badge+'</div><div class="ord-name">👤 '+o.name+'</div><div class="ord-det">'+det+'</div><div class="ord-total">💰 '+o.total+' '+curr+'</div><div class="ord-time">🕐 '+o.time+'</div>'+acts+'</div>';
-  }).join('');
+  document.getElementById('admOrders').innerHTML='<div class="no-ord">⏳ Loading...</div>';
+  listenToOrders(function(orders){
+    var total=orders.reduce(function(s,o){return s+(o.total||0);},0);
+    document.getElementById('admStats').innerHTML=
+      stat(orders.length,'Total')+stat(total+' ₺','Revenue')+
+      stat(orders.filter(function(o){return o.status==='new';}).length,'New')+
+      stat(orders.filter(function(o){return o.status==='working';}).length,'Working')+
+      stat(orders.filter(function(o){return o.status==='ready';}).length,'Ready');
+    if(!orders.length){document.getElementById('admOrders').innerHTML='<div class="no-ord">No orders yet 🧇</div>';return;}
+    var so={new:0,working:1,ready:2,cancelled:3};
+    var fil=orders.filter(function(o){return CURRENT_FILTER==='all'||o.status===CURRENT_FILTER;});
+    fil.sort(function(a,b){return (so[a.status]||0)-(so[b.status]||0);});
+    if(!fil.length){document.getElementById('admOrders').innerHTML='<div class="no-ord">No orders with this status 📭</div>';return;}
+    document.getElementById('admOrders').innerHTML=fil.map(function(o){
+      var curr = o.currency||'₺';
+      var det='<b>Product:</b> '+o.prod+' — '+o.cont+'<br>';
+      if(o.sub&&Object.keys(o.sub).length) det+='<b>Options:</b> '+Object.values(o.sub).join(', ')+'<br>';
+      if(o.choco&&o.choco.length) det+='<b>Choco:</b> '+o.choco.join(', ')+'<br>';
+      if(o.fruit&&o.fruit.length) det+='<b>Fruit:</b> '+o.fruit.join(', ')+'<br>';
+      if(o.deco&&o.deco.length) det+='<b>Deco:</b> '+o.deco.join(', ')+'<br>';
+      if(o.note) det+='<b>Note:</b> '+o.note+'<br>';
+      var cc=o.status==='working'?' status-working-card':o.status==='ready'?' status-ready-card':o.status==='cancelled'?' status-cancelled-card':'';
+      var badge=o.status==='new'?'<span class="ord-badge badge-new">🆕 New</span>':o.status==='working'?'<span class="ord-badge badge-working">⚙️ Working</span>':o.status==='ready'?'<span class="ord-badge badge-ready">✅ Ready</span>':'<span class="ord-badge badge-cancelled">❌ Cancelled</span>';
+      var acts='<div class="ord-actions">';
+      if(o.status!=='working'&&o.status!=='ready'&&o.status!=='cancelled') acts+='<button class="act-btn act-working" onclick="changeStatus(\''+o.id+'\',\'working\')">⚙️ Working</button>';
+      if(o.status!=='ready'&&o.status!=='cancelled') acts+='<button class="act-btn act-ready" onclick="changeStatus(\''+o.id+'\',\'ready\')">✅ Ready</button>';
+      if(o.status!=='cancelled') acts+='<button class="act-btn act-cancel" onclick="changeStatus(\''+o.id+'\',\'cancelled\')">❌ Cancel</button>';
+      if(o.status==='cancelled'||o.status==='ready') acts+='<button class="act-btn act-restore" onclick="changeStatus(\''+o.id+'\',\'new\')">↩️ Restore</button>';
+      acts+='</div>';
+      var timeStr = o.timeDisplay || o.time || '';
+      return '<div class="ord-card'+cc+'"><div class="ord-hdr"><span class="ord-no">#'+o.id+' — Table '+o.table+'</span>'+badge+'</div><div class="ord-name">👤 '+o.name+'</div><div class="ord-det">'+det+'</div><div class="ord-total">💰 '+o.total+' '+curr+'</div><div class="ord-time">🕐 '+timeStr+'</div>'+acts+'</div>';
+    }).join('');
+  });
 }
 function stat(v,l){return '<div class="stat"><div class="stat-v">'+v+'</div><div class="stat-l">'+l+'</div></div>';}
 
