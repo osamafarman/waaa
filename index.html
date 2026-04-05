@@ -789,18 +789,45 @@ var CURRENT_MENU_CAT = 'waffle'; // for menu admin
 var EDIT_MODAL_STATE = { mode:'add', itemId:null }; // mode: add|edit
 var MODAL_SUB_GROUPS = []; // [{labelAr,labelTr,group,options:[{ar,tr,val}]}]
 
-// ===== MENU STORAGE =====
+// ===== MENU STORAGE (Firebase) =====
+var MENU_CACHE = null; // local cache after first load
+
 function getMenu(){
-  try{
-    var saved = localStorage.getItem('puffyMenu');
-    if(saved) return JSON.parse(saved);
-  }catch(e){}
+  // Returns cache if available (sync fallback), else default
+  if(MENU_CACHE) return MENU_CACHE;
   return JSON.parse(JSON.stringify(DEFAULT_MENU));
 }
-function saveMenu(m){ try{localStorage.setItem('puffyMenu',JSON.stringify(m));}catch(e){} }
+
+function loadMenuFromFirebase(callback){
+  initFirebase();
+  DB.collection('config').doc('menu').get()
+    .then(function(doc){
+      if(doc.exists && doc.data().menu){
+        MENU_CACHE = doc.data().menu;
+      } else {
+        MENU_CACHE = JSON.parse(JSON.stringify(DEFAULT_MENU));
+      }
+      if(callback) callback(MENU_CACHE);
+    })
+    .catch(function(e){
+      console.error('loadMenu error:', e);
+      MENU_CACHE = JSON.parse(JSON.stringify(DEFAULT_MENU));
+      if(callback) callback(MENU_CACHE);
+    });
+}
+
+function saveMenu(m){
+  MENU_CACHE = m;
+  initFirebase();
+  DB.collection('config').doc('menu').set({ menu: m })
+    .then(function(){ console.log('Menu saved to Firebase'); })
+    .catch(function(e){ console.error('saveMenu error:', e); alert('❌ فشل حفظ المنيو: '+e.message); });
+}
+
 function resetMenuToDefault(){
   if(confirm('Reset menu to defaults? All changes will be lost.')){
-    localStorage.removeItem('puffyMenu');
+    MENU_CACHE = JSON.parse(JSON.stringify(DEFAULT_MENU));
+    saveMenu(MENU_CACHE);
     renderMenuAdmin();
     renderOrderPage();
     alert('Menu reset to defaults!');
@@ -883,8 +910,12 @@ function setLang(lang){
   document.getElementById('langScreen').style.display='none';
   document.getElementById('mainPage').style.display='';
   document.getElementById('floatBtn').style.display='';
-  renderOrderPage();
   applyTranslations();
+  if(MENU_CACHE){
+    renderOrderPage();
+  } else {
+    loadMenuFromFirebase(function(){ renderOrderPage(); });
+  }
 }
 function switchLang(){
   setLang(LANG==='ar'?'tr':'ar');
@@ -1188,8 +1219,11 @@ function doLogin(){
   } else if(LOGIN_ROLE==='menu' && u==='menuadmin' && p==='menu2024'){
     document.getElementById('loginPage').classList.remove('show');
     document.getElementById('menuAdminPage').classList.add('show');
-    CURRENT_MENU_CAT = Object.keys(getMenu())[0];
-    renderMenuAdmin();
+    document.getElementById('menuItemsGrid').innerHTML='<div style="color:#fff;text-align:center;padding:40px;">&#x23F3; جاري تحميل المنيو...</div>';
+    loadMenuFromFirebase(function(){
+      CURRENT_MENU_CAT = Object.keys(getMenu())[0];
+      renderMenuAdmin();
+    });
   } else {
     e.style.display='block';
     setTimeout(function(){e.style.display='none';},3000);
@@ -1203,7 +1237,8 @@ function showMain(){
   document.getElementById('successPage').style.display='none';
   document.getElementById('mainPage').style.display='';
   document.getElementById('floatBtn').style.display='';
-  renderOrderPage();
+  // Always reload menu from Firebase when returning to main site
+  loadMenuFromFirebase(function(){ renderOrderPage(); });
 }
 
 function filterOrders(f,el){
